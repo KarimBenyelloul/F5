@@ -1,3 +1,11 @@
+#!/bin/bash
+
+# Step 1: Extract IPs from 'tmsh list net self' and save to a temporary file or array
+exclude_ips=$(tmsh list net self | awk '/address/ { match($0, /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/, ip); print ip[0] }')
+
+#echo "IPs to exclude: $exclude_ips"
+
+# Step 2: Extract IPs from 'tmsh list gtm server' and exclude IPs found in the previous step
 devices=$(tmsh list gtm server | awk -v exclude_ips="$exclude_ips" '
   BEGIN {
     # Convert the space-separated exclude_ips string into an array
