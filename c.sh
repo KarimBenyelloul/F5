@@ -43,10 +43,11 @@ ips="192.168.1.1"
 # Loop through each IP in the variable
 for ip in $ips; do
   echo "Processing IP: $ip"
-  CRT=$(openssl s_client -showcerts -host ${ip} -port 4353 </dev/null 2>/dev/null | openssl x509 -outform PEM)
+  openssl s_client -showcerts -host ${ip} -port 4353 </dev/null 2>/dev/null | openssl x509 -outform PEM > ip_cert.crt
 
   echo
 
-  append_if_missing "$CRT" "/config/gtm/server.crt"
+  append_if_missing ip_cert.crt "/config/gtm/server.crt"
 
 done
+rm -f ip_cert.crt
