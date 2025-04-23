@@ -110,12 +110,6 @@ if ! openssl rsa -in "$KEY_INPUT" -noout 2>/dev/null; then
     exit 1
 fi
 
-# Check if destination files exist
-if [ ! -f "$CRT_DEST" ] || [ ! -f "$KEY_DEST" ]; then
-    echo "Error: Destination certificate or key file not found. Aborting."
-    exit 1
-fi
-
 # Validate the given cert and key match
 CERT_MODULUS=$(openssl x509 -noout -modulus -in "$CERT_INPUT" | openssl md5)
 KEY_MODULUS=$(openssl rsa -noout -modulus -in "$KEY_INPUT" | openssl md5)
@@ -124,6 +118,12 @@ if [ "$CERT_MODULUS" != "$KEY_MODULUS" ]; then
     exit 1
 fi
 echo "Given certificate and key match."
+
+# Check if destination files exist
+if [ ! -f "$CRT_DEST" ] || [ ! -f "$KEY_DEST" ]; then
+    echo "Error: Destination certificate or key file not found. Aborting."
+    exit 1
+fi
 
 # Check if httpd is running
 HTTPD_STATUS=$(tmsh show sys service httpd)
