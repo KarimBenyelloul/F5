@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Takes two input files (cert and key) and updates the F5 device certificate.
+# Check if CERT_FILE is a valid certificate and KEY_FILE is a valid key file 
 # Verifies the given cert and key match.
 # Verifies that the current destination cert/key exist
 # Checks if httpd is running.
@@ -61,6 +62,18 @@ append_if_missing() {
 # Check existence of necessary files
 if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
     echo "Error: Source certificate or key file not found. Aborting."
+    exit 1
+fi
+
+# Check if CERT_FILE is a valid certificate
+if ! openssl x509 -in "$CERT_FILE" -noout 2>/dev/null; then
+    echo "Error: $CERT_FILE is not a valid certificate file."
+    exit 1
+fi
+
+# Check if KEY_FILE is a valid private key
+if ! openssl rsa -in "$KEY_FILE" -noout 2>/dev/null; then
+    echo "Error: $KEY_FILE is not a valid private key file."
     exit 1
 fi
 
