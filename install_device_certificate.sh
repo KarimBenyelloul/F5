@@ -1,34 +1,67 @@
 #!/bin/bash
 
-# Takes two input files (cert and key) and updates the F5 device certificate.
-# Check if CERT_FILE is a valid certificate and KEY_FILE is a valid key file 
-# Verifies the given cert and key match.
-# Verifies that the current destination cert/key exist
-# Checks if httpd is running.
-# Backs up the current destination cert/key.
-# Replaces them with the new ones.
-# Restores permissions/ownership.
-# Restarts httpd and checks it restarted correctly.
-# Appends the cert to big3d/client.crt and gtm/server.crt only if not already present.
+# Default verbose mode is off
+VERBOSE=0
 
+# Function to print usage/help message
+print_help() {
+    echo "Usage: $0 <cert_file> <key_file> [options]"
+    echo
+    echo "Options:"
+    echo "  -h, --help      Show this help message"
+    echo "  -v, --verbose   Enable verbose output"
+    echo
+    echo "This script updates the SSL certificate and key on an F5 device."
+    echo "It validates the given certificate and key, checks the service status,"
+    echo "backs up the current certificate and key, installs the new ones,"
+    echo "restores permissions, restarts the httpd service, and appends the cert to"
+    echo "big3d/client.crt and gtm/server.crt if not already present."
+    echo
+    echo "Example usage:"
+    echo "  $0 /path/to/certificate.crt /path/to/private.key"
+    exit 0
+}
 
+# Function to handle verbose output
+verbose_echo() {
+    if [ "$VERBOSE" -eq 1 ]; then
+        echo "$1"
+    fi
+}
+
+# Parse command-line arguments for options
+while [[ "$1" =~ ^- ]]; do
+    case "$1" in
+        -h|--help)
+            print_help
+            ;;
+        -v|--verbose)
+            VERBOSE=1
+            shift
+            ;;
+        *)
+            echo "Error: Unknown option $1"
+            print_help
+            ;;
+    esac
+done
 
 # Ensure two arguments are passed (certificate and key files)
 if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <cert_file> <key_file>"
-    exit 1
+    echo "Error: Missing certificate or key file."
+    print_help
 fi
 
 # Source files (provided by the user)
-CERT_FILE="$1"
-KEY_FILE="$2"
+CERT_INPUT="$1"
+KEY_INPUT="$2"
 
 # Destination file paths
 CRT_DEST="/config/httpd/conf/ssl.crt/server.crt"
 KEY_DEST="/config/httpd/conf/ssl.key/server.key"
 BACKUP_SUFFIX=$(date +%Y%m%d_%H%M%S)
 
-# Function to check and append certificate only if not already present
+# Function to check and append certificate CRT_TO_ADD only if not already present in CRT_LIST_FILE
 append_if_missing() {
     CRT_TO_ADD="$1"
     CRT_LIST_FILE="$2"
@@ -60,25 +93,44 @@ append_if_missing() {
 }
 
 # Check existence of necessary files
-if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
+if [ ! -f "$CERT_INPUT" ] || [ ! -f "$KEY_INPUT" ]; then
     echo "Error: Source certificate or key file not found. Aborting."
     exit 1
 fi
 
-# Check if CERT_FILE is a valid certificate
-if ! openssl x509 -in "$CERT_FILE" -noout 2>/dev/null; then
-    echo "Error: $CERT_FILE is not a valid certificate file."
+# Check if CERT_INPUT is a valid certificate
+if ! openssl x509 -in "$CERT_INPUT" -noout 2>/dev/null; then
+    echo "Error: $CERT_INPUT is not a valid certificate file."
     exit 1
 fi
 
-# Check if KEY_FILE is a valid private key
-if ! openssl rsa -in "$KEY_FILE" -noout 2>/dev/null; then
-    echo "Error: $KEY_FILE is not a valid private key file."
+# Check if KEY_INPUT is a valid private key
+if ! openssl rsa -in "$KEY_INPUT" -noout 2>/dev/null; then
+    echo "Error: $KEY_INPUT is not a valid private key file."
     exit 1
 fi
 
+# Check if destination files exist
 if [ ! -f "$CRT_DEST" ] || [ ! -f "$KEY_DEST" ]; then
     echo "Error: Destination certificate or key file not found. Aborting."
+    exit 1
+fi
+
+# Validate the given cert and key match
+CERT_MODULUS=$(openssl x509 -noout -modulus -in "$CERT_INPUT" | openssl md5)
+KEY_MODULUS=$(openssl rsa -noout -modulus -in "$KEY_INPUT" | openssl md5)
+if [ "$CERT_MODULUS" != "$KEY_MODULUS" ]; then
+    echo "Error: Certificate and key do not match!"
+    exit 1
+fi
+echo "Given certificate and key match."
+
+# Check if httpd is running
+HTTPD_STATUS=$(tmsh show sys service httpd)
+if [[ "$HTTPD_STATUS" == *"is running"* ]]; then
+    verbose_echo "httpd service is running."
+else
+    echo "Error: httpd service is not running. Aborting."
     exit 1
 fi
 
@@ -87,36 +139,20 @@ cp "$CRT_DEST" "${CRT_DEST}.${BACKUP_SUFFIX}.bak"
 cp "$KEY_DEST" "${KEY_DEST}.${BACKUP_SUFFIX}.bak"
 echo "Backup of existing cert and key created."
 
-# Validate the given cert and key match
-CERT_MODULUS=$(openssl x509 -noout -modulus -in "$CERT_FILE" | openssl md5)
-KEY_MODULUS=$(openssl rsa -noout -modulus -in "$KEY_FILE" | openssl md5)
-if [ "$CERT_MODULUS" != "$KEY_MODULUS" ]; then
-    echo "Error: Certificate and key do not match!"
-    exit 1
-fi
-echo "Given certificate and key match."
-
-
-# Check if httpd is running
-HTTPD_STATUS=$(tmsh show sys service httpd)
-if [[ "$HTTPD_STATUS" == *"is running"* ]]; then
-    echo "httpd service is running."
-else
-    echo "Error: httpd service is not running. Aborting."
-    exit 1
-fi
 
 # Replace with new cert and key
-cp "$CERT_FILE" "$CRT_DEST"
-cp "$KEY_FILE" "$KEY_DEST"
+echo "Replacing the current cert and key with new ones..."
+cp "$CERT_INPUT" "$CRT_DEST"
+cp "$KEY_INPUT" "$KEY_DEST"
 
 # Restore permissions and ownership
+verbose_echo "Restoring permissions and ownership..."
 chmod --reference="${CRT_DEST}.${BACKUP_SUFFIX}.bak" "$CRT_DEST"
 chmod --reference="${KEY_DEST}.${BACKUP_SUFFIX}.bak" "$KEY_DEST"
 chown --reference="${CRT_DEST}.${BACKUP_SUFFIX}.bak" "$CRT_DEST"
 chown --reference="${KEY_DEST}.${BACKUP_SUFFIX}.bak" "$KEY_DEST"
 
-echo "New cert and key installed with correct permissions."
+verbose_echo "New cert and key installed with correct permissions."
 
 # Restart httpd
 echo "Restarting httpd..."
@@ -131,6 +167,7 @@ else
 fi
 
 # Append cert to big3d and gtm if not already present
+echo "Appending cert to big3d and gtm if not already present..."
 append_if_missing "$CRT_DEST" "/config/big3d/client.crt"
 append_if_missing "$CRT_DEST" "/config/gtm/server.crt"
 
