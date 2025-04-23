@@ -29,13 +29,14 @@ BACKUP_SUFFIX=$(date +%Y%m%d_%H%M%S)
 
 # Function to check and append certificate only if not already present
 append_if_missing() {
-    TARGET_FILE="$1"
+    CRT_TO_ADD="$1"
+    CRT_LIST_FILE="$2"
 
-    NEW_CERT_HASH=$(openssl x509 -in "$CRT_DEST" -outform PEM | sha256sum | awk '{print $1}')
+    NEW_CERT_HASH=$(openssl x509 -in "$CRT_TO_ADD" -outform PEM | sha256sum | awk '{print $1}')
     FOUND=0
 
     # Split the target into individual certs and compare hash
-    csplit -f temp-cert- "$TARGET_FILE" '/-----BEGIN CERTIFICATE-----/' '{*}' >/dev/null 2>&1
+    csplit -f temp-cert- "$CRT_LIST_FILE" '/-----BEGIN CERTIFICATE-----/' '{*}' >/dev/null 2>&1
 
     for CERT in temp-cert-*; do
         if grep -q "BEGIN CERTIFICATE" "$CERT"; then
@@ -50,13 +51,12 @@ append_if_missing() {
     rm -f temp-cert-*
 
     if [ "$FOUND" -eq 1 ]; then
-        echo "Certificate already exists in $TARGET_FILE. Skipping append."
+        echo "Certificate already exists in $CRT_LIST_FILE. Skipping append."
     else
-        cat "$CRT_DEST" >> "$TARGET_FILE"
-        echo "Appended cert to $TARGET_FILE"
+        cat "$CRT_TO_ADD" >> "$CRT_LIST_FILE"
+        echo "Appended cert to $CRT_LIST_FILE"
     fi
 }
-
 
 # Check existence of necessary files
 if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
@@ -118,7 +118,7 @@ else
 fi
 
 # Append cert to big3d and gtm if not already present
-append_if_missing "/config/big3d/client.crt"
-append_if_missing "/config/gtm/server.crt"
+append_if_missing "$CRT_DEST" "/config/big3d/client.crt"
+append_if_missing "$CRT_DEST" "/config/gtm/server.crt"
 
 echo "SSL certificate and key updated and propagated successfully."
