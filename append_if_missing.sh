@@ -2,7 +2,7 @@
 
 # Iterating Over Each Certificate in CRTS_TO_ADD
 # For each certificate, it verifies if it already exists in CRT_LIST_FILE
-# If not, it appands it.
+# If not, appends it.
 
 
 CRTS_TO_ADD="$1"
