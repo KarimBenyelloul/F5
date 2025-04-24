@@ -135,22 +135,22 @@ else
 fi
 
 # Backup current cert and key
-cp "$CRT_DEST" "${CRT_DEST}.${BACKUP_SUFFIX}.bak"
-cp "$KEY_DEST" "${KEY_DEST}.${BACKUP_SUFFIX}.bak"
+cp "$CRT_DEST" "/var/tmp/server.crt.${BACKUP_SUFFIX}.bak"
+cp "$KEY_DEST" "/var/tmp/server.key.${BACKUP_SUFFIX}.bak"
 echo "Backup of existing cert and key created."
 
 
 # Replace with new cert and key
 echo "Replacing the current cert and key with new ones..."
-cp "$CERT_INPUT" "$CRT_DEST"
-cp "$KEY_INPUT" "$KEY_DEST"
+cp "$CERT_INPUT" "/var/tmp/server.crt.${BACKUP_SUFFIX}.bak"
+cp "$KEY_INPUT" "/var/tmp/server.key.${BACKUP_SUFFIX}.bak"
 
 # Restore permissions and ownership
 verbose_echo "Restoring permissions and ownership..."
-chmod --reference="${CRT_DEST}.${BACKUP_SUFFIX}.bak" "$CRT_DEST"
-chmod --reference="${KEY_DEST}.${BACKUP_SUFFIX}.bak" "$KEY_DEST"
-chown --reference="${CRT_DEST}.${BACKUP_SUFFIX}.bak" "$CRT_DEST"
-chown --reference="${KEY_DEST}.${BACKUP_SUFFIX}.bak" "$KEY_DEST"
+chmod --reference="/var/tmp/server.crt.${BACKUP_SUFFIX}.bak" "$CRT_DEST"
+chmod --reference="/var/tmp/server.key.${BACKUP_SUFFIX}.bak" "$KEY_DEST"
+chown --reference="/var/tmp/server.crt.${BACKUP_SUFFIX}.bak" "$CRT_DEST"
+chown --reference="/var/tmp/server.key.${BACKUP_SUFFIX}.bak" "$KEY_DEST"
 
 verbose_echo "New cert and key installed with correct permissions."
 
