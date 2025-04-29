@@ -142,8 +142,8 @@ echo "Backup of existing cert and key created."
 
 # Replace with new cert and key
 echo "Replacing the current cert and key with new ones..."
-cp "$CERT_INPUT" "/var/tmp/server.crt.${BACKUP_SUFFIX}.bak"
-cp "$KEY_INPUT" "/var/tmp/server.key.${BACKUP_SUFFIX}.bak"
+cp "$CERT_INPUT" "/config/httpd/conf/ssl.crt/server.crt"
+cp "$KEY_INPUT" "/config/httpd/conf/ssl.key/server.key"
 
 # Restore permissions and ownership
 verbose_echo "Restoring permissions and ownership..."
